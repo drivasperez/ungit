@@ -1,10 +1,13 @@
-use async_std::task;
+use anyhow::Result;
+use async_std::{fs, task};
 use flate2::read::GzDecoder;
 use http_types::StatusCode;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 use tar::Archive;
 use thiserror::Error;
+
+const ARCHIVE_LOCATION: &'static str = "./gitter_archive";
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "gitter", about = "Just making a CLI")]
@@ -27,14 +30,8 @@ enum GitterError {
     #[error("Network error")]
     NetworkError(http_types::Error),
     #[error("Unknown status code")]
-    UnknownStatusCode(StatusCode),
-    #[error("Too many redirects")]
-    TooManyRedirects,
-    #[error("IO Error")]
     IOError(std::io::Error),
 }
-
-type Result<T, E = GitterError> = std::result::Result<T, E>;
 
 fn main() -> Result<()> {
     let options = Opt::from_args();
@@ -46,21 +43,28 @@ fn main() -> Result<()> {
         println!("Fetching latest from {}", uri);
         let sha = fetch_latest_sha(&options.user, &options.repository).await?;
         println!("Latest commit hash: {}", sha);
-        fetch_bytes(&uri).await
-    })
-    .and_then(|bytes| {
-        decompress_tarball(&bytes, &options.target.unwrap_or(".".into()))
-            .map_err(move |e| GitterError::IOError(e))
+        let bytes = fetch_bytes(&uri).await?;
+        save_tarball(&bytes, &options.repository, &sha).await
     })
 }
 
-fn decompress_tarball<P: AsRef<std::path::Path>>(
-    bytes: &[u8],
-    path: P,
-) -> Result<(), std::io::Error> {
-    let tar = GzDecoder::new(bytes);
-    let mut archive = Archive::new(tar);
-    archive.unpack(path)
+// fn decompress_tarball<P: AsRef<std::path::Path>>(bytes: &[u8], path: P) -> Result<()> {
+//     let tar = GzDecoder::new(bytes);
+//     let mut archive = Archive::new(tar);
+//     archive.unpack(path)?;
+// Ok(())
+// }
+
+async fn save_tarball(bytes: &[u8], repo: &str, hash: &str) -> Result<()> {
+    let path = get_archive_path(repo, hash);
+    fs::create_dir_all(ARCHIVE_LOCATION).await?;
+    fs::write(path, bytes).await?;
+
+    Ok(())
+}
+
+fn get_archive_path(repo: &str, hash: &str) -> String {
+    format!("{}/{}-{}.tar.gz", ARCHIVE_LOCATION, repo, hash)
 }
 
 async fn fetch_bytes(uri: &str) -> Result<Vec<u8>> {
@@ -71,21 +75,8 @@ async fn fetch_bytes(uri: &str) -> Result<Vec<u8>> {
     println!("Status code: {}", res.status());
 
     match res.status() {
-        StatusCode::Ok => res.body_bytes().await.map_err(|e| GitterError::IOError(e)),
-        StatusCode::NotFound => Err(GitterError::NotFound),
-        StatusCode::Found => {
-            let loc = res.header("location").unwrap().as_str();
-            println!("Redirecting to {}", loc);
-            res = surf::get(loc)
-                .await
-                .map_err(|e| GitterError::NetworkError(e))?;
-            if res.status() != StatusCode::Ok {
-                Err(GitterError::TooManyRedirects)
-            } else {
-                res.body_bytes().await.map_err(|e| GitterError::IOError(e))
-            }
-        }
-        status => Err(GitterError::UnknownStatusCode(status)),
+        StatusCode::Ok => Ok(res.body_bytes().await?),
+        _ => Err(GitterError::NotFound.into()),
     }
 }
 
