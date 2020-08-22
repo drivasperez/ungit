@@ -1,13 +1,11 @@
 use anyhow::Result;
-use async_std::{fs, task};
-use flate2::read::GzDecoder;
+use async_std::task;
 use http_types::StatusCode;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use tar::Archive;
 use thiserror::Error;
 
-const ARCHIVE_LOCATION: &'static str = "./gitter_archive";
+mod cache;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "gitter", about = "Just making a CLI")]
@@ -40,31 +38,12 @@ fn main() -> Result<()> {
             "https://codeload.github.com/{}/{}/tar.gz/master",
             options.user, options.repository
         );
-        println!("Fetching latest from {}", uri);
+        eprintln!("Fetching latest from {}", uri);
         let sha = fetch_latest_sha(&options.user, &options.repository).await?;
-        println!("Latest commit hash: {}", sha);
+        eprintln!("Latest commit hash: {}", sha);
         let bytes = fetch_bytes(&uri).await?;
-        save_tarball(&bytes, &options.repository, &sha).await
+        cache::save_tarball(&bytes, &options.repository, &sha).await
     })
-}
-
-// fn decompress_tarball<P: AsRef<std::path::Path>>(bytes: &[u8], path: P) -> Result<()> {
-//     let tar = GzDecoder::new(bytes);
-//     let mut archive = Archive::new(tar);
-//     archive.unpack(path)?;
-// Ok(())
-// }
-
-async fn save_tarball(bytes: &[u8], repo: &str, hash: &str) -> Result<()> {
-    let path = get_archive_path(repo, hash);
-    fs::create_dir_all(ARCHIVE_LOCATION).await?;
-    fs::write(path, bytes).await?;
-
-    Ok(())
-}
-
-fn get_archive_path(repo: &str, hash: &str) -> String {
-    format!("{}/{}-{}.tar.gz", ARCHIVE_LOCATION, repo, hash)
 }
 
 async fn fetch_bytes(uri: &str) -> Result<Vec<u8>> {
@@ -72,7 +51,7 @@ async fn fetch_bytes(uri: &str) -> Result<Vec<u8>> {
         .await
         .map_err(|e| GitterError::NetworkError(e))?;
 
-    println!("Status code: {}", res.status());
+    eprintln!("Status code: {}", res.status());
 
     match res.status() {
         StatusCode::Ok => Ok(res.body_bytes().await?),
