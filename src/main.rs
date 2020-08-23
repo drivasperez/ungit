@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
+use async_std::path::Path;
 use async_std::task;
 use structopt::StructOpt;
 
@@ -29,7 +30,7 @@ fn main() -> Result<()> {
         target,
     } = Opt::from_args();
 
-    let target = target.unwrap_or(".".into());
+    let target = target.unwrap_or(repository.clone());
     let repository = Repository::new(user, repository);
 
     task::block_on(async {
@@ -39,16 +40,14 @@ fn main() -> Result<()> {
         eprintln!("Latest commit hash: {}", sha);
         if !cache::check_archive_exists(&repository, &sha).await {
             eprintln!("Cached version not found");
+            cache::remove_old_version(&repository).await?;
             let bytes = repository.fetch_bytes().await?;
             cache::save_tarball(&bytes, &repository, &sha).await?;
         } else {
             eprintln!("Cached version found, unpacking");
         };
         let archive_path = cache::get_archive_path(&repository, &sha);
-        eprintln!("Unpacking from {}", &archive_path);
-        cache::decompress_tarball(
-            std::path::Path::new(&archive_path),
-            std::path::Path::new(&target),
-        )
+        eprintln!("Unpacking from {:?}", &archive_path);
+        cache::decompress_tarball(Path::new(&archive_path), Path::new(&target))
     })
 }

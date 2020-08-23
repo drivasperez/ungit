@@ -2,23 +2,45 @@ use crate::repo::Repository;
 use anyhow::{Context, Result};
 use async_std::fs;
 use async_std::path::Path;
+use async_std::prelude::*;
+use directories::BaseDirs;
 use flate2::read::GzDecoder;
+use std::path::PathBuf;
 use tar::Archive;
 
-const ARCHIVE_LOCATION: &'static str = "./gitter_archive";
+const ARCHIVE_NAME: &'static str = ".gitter";
 
-pub fn decompress_tarball(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
+pub fn decompress_tarball(from: &Path, to: &Path) -> Result<()> {
     let tarball = std::fs::File::open(from)
         .with_context(|| format!("Couldn't open tarball at path {:?}", &from))?;
     let tar = GzDecoder::new(tarball);
     let mut archive = Archive::new(tar);
-    archive.unpack(to).context("Co")?;
+    archive
+        .entries()?
+        .filter_map(|e| e.ok())
+        .map(|mut entry| -> Result<PathBuf> {
+            let path = entry.path()?;
+            let path = path
+                .strip_prefix(path.components().next().unwrap())?
+                .to_owned();
+            entry.unpack(to.join(&path))?;
+            Ok(path)
+        })
+        .filter_map(|e| e.ok())
+        .for_each(|p| eprintln!("Unpacking {:?}", &p));
     Ok(())
 }
 
-pub fn get_archive_path(repo: &Repository, hash: &str) -> String {
-    let repo_name = format!("{}_{}", &repo.user, &repo.repo);
-    format!("{}/{}-{}.tar.gz", ARCHIVE_LOCATION, repo_name, hash)
+pub fn get_cache_path() -> PathBuf {
+    let base_dirs = BaseDirs::new().unwrap();
+    let home = base_dirs.home_dir();
+    home.join(ARCHIVE_NAME)
+}
+
+pub fn get_archive_path(repo: &Repository, hash: &str) -> PathBuf {
+    let cache = get_cache_path();
+    let tarball_name = format!("{}_{}-{}.tar.gz", &repo.user, &repo.repo, hash);
+    cache.join(tarball_name)
 }
 
 pub async fn check_archive_exists(repo: &Repository, sha: &str) -> bool {
@@ -28,8 +50,27 @@ pub async fn check_archive_exists(repo: &Repository, sha: &str) -> bool {
 
 pub async fn save_tarball(bytes: &[u8], repo: &Repository, hash: &str) -> Result<()> {
     let path = get_archive_path(&repo, hash);
-    fs::create_dir_all(ARCHIVE_LOCATION).await?;
+    fs::create_dir_all(get_cache_path()).await?;
     fs::write(path, bytes).await?;
+
+    Ok(())
+}
+
+pub async fn remove_old_version(repo: &Repository) -> Result<()> {
+    let cache = get_cache_path();
+    let mut files = fs::read_dir(cache).await?;
+
+    let repo_str = format!("{}_{}", &repo.user, &repo.repo);
+
+    while let Some(res) = files.next().await {
+        let entry = res?;
+        let os_str = entry.file_name();
+        let file_name = os_str.to_string_lossy();
+        if file_name.starts_with(&repo_str) {
+            eprintln!("Removing old version");
+            fs::remove_file(entry.path()).await?;
+        };
+    }
 
     Ok(())
 }
