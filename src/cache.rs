@@ -8,7 +8,7 @@ use flate2::read::GzDecoder;
 use std::path::PathBuf;
 use tar::Archive;
 
-const ARCHIVE_NAME: &'static str = ".gitter";
+const ARCHIVE_NAME: &str = ".gitter";
 
 pub fn decompress_tarball(from: &Path, to: &Path) -> Result<()> {
     let tarball = std::fs::File::open(from)

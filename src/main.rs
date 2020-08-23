@@ -30,7 +30,7 @@ fn main() -> Result<()> {
         target,
     } = Opt::from_args();
 
-    let target = target.unwrap_or(repository.clone());
+    let target = target.unwrap_or_else(|| repository.clone());
     let repository = Repository::new(user, repository);
 
     task::block_on(async {

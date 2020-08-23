@@ -1,5 +1,5 @@
 use crate::error::GitterError;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use http_types::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -35,32 +35,41 @@ impl Repository {
 
     pub fn latest_master_tarball_uri(&self) -> String {
         format!(
-            "https://codeload.github.com/{}/{}/tar.gz/master",
+            "https://api.github.com/repos/{}/{}/tarball/master",
             &self.user, &self.repo
         )
     }
 
     pub async fn fetch_latest_sha(&self) -> Result<String> {
         let uri = self.github_uri();
-        let mut res = surf::get(uri)
-            .await
-            .map_err(|e| GitterError::NetworkError(e))?;
+        let mut res = surf::get(uri).await.map_err(GitterError::NetworkError)?;
 
-        let repo: Branch = res.body_json().await.map_err(|e| GitterError::IOError(e))?;
+        let repo: Branch = res.body_json().await.map_err(GitterError::IOError)?;
 
-        Ok(repo.commit.sha.to_owned())
+        Ok(repo.commit.sha)
     }
 
     pub async fn fetch_bytes(&self) -> Result<Vec<u8>> {
         let uri = self.latest_master_tarball_uri();
         let mut res = surf::get(uri)
+            .set_header("accept", "application/vnd.github.v3+json")
             .await
-            .map_err(|e| GitterError::NetworkError(e))?;
-
-        eprintln!("Status code: {}", res.status());
+            .map_err(GitterError::NetworkError)?;
 
         match res.status() {
             StatusCode::Ok => Ok(res.body_bytes().await?),
+            StatusCode::Found => {
+                let location = res.header("location").unwrap();
+                res = surf::get(location.as_str())
+                    .set_header("accept", "application/vnd.github.v3+json")
+                    .await
+                    .map_err(GitterError::NetworkError)
+                    .context("Couldn't follow redirect")?;
+                match res.status() {
+                    StatusCode::Ok => Ok(res.body_bytes().await?),
+                    _ => Err(GitterError::NotFound.into()),
+                }
+            }
             _ => Err(GitterError::NotFound.into()),
         }
     }

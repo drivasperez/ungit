@@ -816,6 +816,7 @@ dependencies = [
  "async-std",
  "directories",
  "flate2",
+ "futures 0.3.5",
  "http-types",
  "serde",
  "serde_json",
