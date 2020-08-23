@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_std::task;
 use structopt::StructOpt;
 
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
         eprintln!("Fetching latest from {}", uri);
         let sha = repository.fetch_latest_sha().await?;
         eprintln!("Latest commit hash: {}", sha);
-        if cache::check_archive_exists(&repository, &sha).await {
+        if !cache::check_archive_exists(&repository, &sha).await {
             eprintln!("Cached version not found");
             let bytes = repository.fetch_bytes().await?;
             cache::save_tarball(&bytes, &repository, &sha).await?;
@@ -46,6 +46,9 @@ fn main() -> Result<()> {
         };
         let archive_path = cache::get_archive_path(&repository, &sha);
         eprintln!("Unpacking from {}", &archive_path);
-        cache::decompress_tarball(&archive_path, &target)
+        cache::decompress_tarball(
+            std::path::Path::new(&archive_path),
+            std::path::Path::new(&target),
+        )
     })
 }

@@ -1,20 +1,18 @@
 use crate::repo::Repository;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_std::fs;
 use async_std::path::Path;
 use flate2::read::GzDecoder;
 use tar::Archive;
 
-const ARCHIVE_LOCATION: &'static str = "~/.gitter_archive";
+const ARCHIVE_LOCATION: &'static str = "./gitter_archive";
 
-pub fn decompress_tarball<I: AsRef<std::path::Path>, O: AsRef<std::path::Path>>(
-    from: I,
-    to: O,
-) -> Result<()> {
-    let tarball = std::fs::File::open(from)?;
+pub fn decompress_tarball(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
+    let tarball = std::fs::File::open(from)
+        .with_context(|| format!("Couldn't open tarball at path {:?}", &from))?;
     let tar = GzDecoder::new(tarball);
     let mut archive = Archive::new(tar);
-    archive.unpack(to)?;
+    archive.unpack(to).context("Co")?;
     Ok(())
 }
 
