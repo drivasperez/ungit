@@ -15,19 +15,18 @@ pub fn decompress_tarball(from: &Path, to: &Path) -> Result<()> {
         .with_context(|| format!("Couldn't open tarball at path {:?}", &from))?;
     let tar = GzDecoder::new(tarball);
     let mut archive = Archive::new(tar);
-    archive
-        .entries()?
-        .filter_map(|e| e.ok())
-        .map(|mut entry| -> Result<PathBuf> {
-            let path = entry.path()?;
-            let path = path
-                .strip_prefix(path.components().next().unwrap())?
-                .to_owned();
-            entry.unpack(to.join(&path))?;
-            Ok(path)
-        })
-        .filter_map(|e| e.ok())
-        .for_each(|p| eprintln!("Unpacking {:?}", &p));
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        let path = path
+            .strip_prefix(path.components().next().unwrap())?
+            .to_owned();
+        entry.unpack(to.join(&path))?;
+
+        eprintln!("Unpacking {:?}", &path);
+    }
+
     Ok(())
 }
 
