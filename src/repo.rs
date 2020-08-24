@@ -1,7 +1,7 @@
 use crate::error::GitterError;
 use anyhow::{Context, Result};
 use http_types::StatusCode;
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

@@ -5,7 +5,7 @@ use async_std::path::Path;
 use async_std::prelude::*;
 use directories::BaseDirs;
 use flate2::read::GzDecoder;
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ProgressBar;
 use std::path::PathBuf;
 use tar::Archive;
 
