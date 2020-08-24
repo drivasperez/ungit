@@ -5,6 +5,7 @@ use async_std::path::Path;
 use async_std::prelude::*;
 use directories::BaseDirs;
 use flate2::read::GzDecoder;
+use indicatif::{ProgressBar, ProgressIterator};
 use std::path::PathBuf;
 use tar::Archive;
 
@@ -16,16 +17,22 @@ pub fn decompress_tarball(from: &Path, to: &Path) -> Result<()> {
     let tar = GzDecoder::new(tarball);
     let mut archive = Archive::new(tar);
 
-    for entry in archive.entries()? {
+    let entries = archive.entries()?;
+
+    let progress = ProgressBar::new_spinner();
+
+    for entry in entries {
         let mut entry = entry?;
         let path = entry.path()?;
         let path = path
             .strip_prefix(path.components().next().unwrap())?
             .to_owned();
-        entry.unpack(to.join(&path))?;
 
-        eprintln!("Unpacking {:?}", &path);
+        progress.set_message(&path.to_str().unwrap_or("File"));
+        entry.unpack(to.join(&path))?;
     }
+
+    progress.finish_with_message("Finished unpacking");
 
     Ok(())
 }

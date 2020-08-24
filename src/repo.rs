@@ -1,6 +1,7 @@
 use crate::error::GitterError;
 use anyhow::{Context, Result};
 use http_types::StatusCode;
+use indicatif::{ProgressBar, ProgressIterator};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -51,12 +52,16 @@ impl Repository {
 
     pub async fn fetch_bytes(&self) -> Result<Vec<u8>> {
         let uri = self.latest_master_tarball_uri();
+
+        let progress = ProgressBar::new_spinner();
+        progress.set_message(&format!("Downloading from {}", &uri));
+
         let mut res = surf::get(uri)
             .set_header("accept", "application/vnd.github.v3+json")
             .await
             .map_err(GitterError::NetworkError)?;
 
-        match res.status() {
+        let val = match res.status() {
             StatusCode::Ok => Ok(res.body_bytes().await?),
             StatusCode::Found => {
                 let location = res.header("location").unwrap();
@@ -71,7 +76,9 @@ impl Repository {
                 }
             }
             _ => Err(GitterError::NotFound.into()),
-        }
+        };
+        progress.finish_with_message("Download complete");
+        val
     }
 }
 
