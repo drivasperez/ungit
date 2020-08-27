@@ -10,9 +10,14 @@ mod repo;
 use repo::Repository;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "gitter", about = "Just making a CLI")]
+#[structopt(
+    name = "gitter",
+    about = "A small command-line utility for downloading the latest version of a repository from Github.
+Useful for scaffolding new projects from a template."
+)]
 struct Opt {
-    /// The repository to load
+    /// The repository to load.
+    /// Format: {USER}/{REPOSITORY}
     #[structopt()]
     repo: String,
     /// The location the repository should be unpacked to
