@@ -9,7 +9,7 @@ use indicatif::ProgressBar;
 use std::path::PathBuf;
 use tar::Archive;
 
-const ARCHIVE_NAME: &str = ".gitter";
+const ARCHIVE_NAME: &str = ".ungit";
 
 pub fn decompress_tarball(from: &Path, to: &Path) -> Result<()> {
     let tarball = std::fs::File::open(from)
