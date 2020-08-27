@@ -1,11 +1,11 @@
 [package]
-name = "gitter"
+name = "ungit"
 version = "0.1.1"
 authors = ["Daniel Rivas Perez <Daniel.Rivas@huddle.com>"]
 edition = "2018"
 description = "A small command-line utility for downloading the latest version of a repository from Github. Useful for scaffolding new projects from a template. Based on the JavaScript utility degit."
 readme = "README.md"
-repository = "https://github.com/drivasperez/gitter"
+repository = "https://github.com/drivasperez/ungit"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
