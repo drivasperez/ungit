@@ -5,7 +5,7 @@ use async_std::path::Path;
 use async_std::prelude::*;
 use directories::BaseDirs;
 use flate2::read::GzDecoder;
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ProgressBar;
 use std::path::PathBuf;
 use tar::Archive;
 
@@ -45,7 +45,7 @@ pub fn get_cache_path() -> PathBuf {
 
 pub fn get_archive_path(repo: &Repository, hash: &str) -> PathBuf {
     let cache = get_cache_path();
-    let tarball_name = format!("{}_{}-{}.tar.gz", &repo.user, &repo.repo, hash);
+    let tarball_name = format!("{}_{}-{}.tar.gz", repo.user(), repo.repo(), hash);
     cache.join(tarball_name)
 }
 
@@ -66,7 +66,7 @@ pub async fn remove_old_version(repo: &Repository) -> Result<()> {
     let cache = get_cache_path();
     let mut files = fs::read_dir(cache).await?;
 
-    let repo_str = format!("{}_{}", &repo.user, &repo.repo);
+    let repo_str = format!("{}_{}", repo.user(), repo.repo());
 
     while let Some(res) = files.next().await {
         let entry = res?;

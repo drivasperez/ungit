@@ -1,7 +1,9 @@
 use crate::error::GitterError;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use http_types::StatusCode;
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ProgressBar;
+use once_cell::sync::OnceCell;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -18,13 +20,30 @@ struct Branch {
 
 #[derive(Debug)]
 pub struct Repository {
-    pub user: String,
-    pub repo: String,
+    user: String,
+    repo: String,
 }
 
 impl Repository {
-    pub fn new(user: String, repo: String) -> Self {
-        Repository { user, repo }
+    pub fn new(repository: String) -> Result<Self> {
+        static RE: OnceCell<Regex> = OnceCell::new();
+
+        let re = RE.get_or_init(|| Regex::new(r"^(\w+)/(\w+)$").unwrap());
+        let captures = re
+            .captures(&repository)
+            .ok_or_else(|| anyhow!("Could not parse repository name from input"))?;
+
+        let user = captures[1].to_owned();
+        let repo = captures[2].to_owned();
+        Ok(Repository { user, repo })
+    }
+
+    pub fn user(&self) -> &str {
+        &self.user
+    }
+
+    pub fn repo(&self) -> &str {
+        &self.repo
     }
 
     pub fn github_uri(&self) -> String {
