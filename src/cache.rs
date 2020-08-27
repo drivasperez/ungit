@@ -64,18 +64,20 @@ pub async fn save_tarball(bytes: &[u8], repo: &Repository, hash: &str) -> Result
 
 pub async fn remove_old_version(repo: &Repository) -> Result<()> {
     let cache = get_cache_path();
-    let mut files = fs::read_dir(cache).await?;
+    if std::path::Path::exists(&get_cache_path()) {
+        let mut files = fs::read_dir(cache).await?;
 
-    let repo_str = format!("{}_{}", repo.user(), repo.repo());
+        let repo_str = format!("{}_{}", repo.user(), repo.repo());
 
-    while let Some(res) = files.next().await {
-        let entry = res?;
-        let os_str = entry.file_name();
-        let file_name = os_str.to_string_lossy();
-        if file_name.starts_with(&repo_str) {
-            eprintln!("Removing old version");
-            fs::remove_file(entry.path()).await?;
-        };
+        while let Some(res) = files.next().await {
+            let entry = res?;
+            let os_str = entry.file_name();
+            let file_name = os_str.to_string_lossy();
+            if file_name.starts_with(&repo_str) {
+                eprintln!("Removing old version");
+                fs::remove_file(entry.path()).await?;
+            };
+        }
     }
 
     Ok(())
