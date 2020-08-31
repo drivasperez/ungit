@@ -25,12 +25,14 @@ pub struct Repository {
 }
 
 impl Repository {
-    pub fn new(repository: String) -> Result<Self> {
+    pub fn new(repository: &str) -> Result<Self> {
         static RE: OnceCell<Regex> = OnceCell::new();
 
-        let re = RE.get_or_init(|| Regex::new(r"^(\w+)/(\w+)$").unwrap());
+        let re = RE.get_or_init(|| {
+            Regex::new(r"^([A-Za-z0-9][A-Za-z0-9-]+[A-Za-z0-9])/([\w_.-]+)$").unwrap()
+        });
         let captures = re
-            .captures(&repository)
+            .captures(repository)
             .ok_or_else(|| anyhow!("Could not parse repository name from input"))?;
 
         let user = captures[1].to_owned();
@@ -104,5 +106,43 @@ impl Repository {
 impl std::fmt::Display for Repository {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}/{}", self.user, self.repo)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn parse_repo_name() {
+        // Username may only contain alphanumeric characters or single hyphens, and cannot begin or end with a hyphen.
+        // Repo name can contain alphanumerics, underscores, hyphens and periods
+        let repo = Repository::new("drivasperez/stashet").unwrap();
+        assert_eq!(repo.user(), "drivasperez");
+        assert_eq!(repo.repo(), "stashet");
+
+        let repo = Repository::new("diesel-rs/diesel").unwrap();
+        assert_eq!(repo.user(), "diesel-rs");
+        assert_eq!(repo.repo(), "diesel");
+
+        let repo = Repository::new("diesel_rs/diesel");
+        assert!(repo.is_err());
+
+        let repo = Repository::new("plivo-/plivo-python");
+        assert!(repo.is_err());
+
+        let repo = Repository::new("---plivo/plivo-python");
+        assert!(repo.is_err());
+
+        let repo = Repository::new("plivo/plivo-python").unwrap();
+        assert_eq!(repo.user(), "plivo");
+        assert_eq!(repo.repo(), "plivo-python");
+
+        let repo = Repository::new("plivo/plivo_python3.-hello").unwrap();
+        assert_eq!(repo.user(), "plivo");
+        assert_eq!(repo.repo(), "plivo_python3.-hello");
+
+        let broken_repo = Repository::new("oeaehoaetnnetss");
+        assert!(broken_repo.is_err());
     }
 }

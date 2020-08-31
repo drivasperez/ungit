@@ -28,7 +28,7 @@ struct Opt {
 fn main() -> Result<()> {
     let Opt { repo, target } = Opt::from_args();
 
-    let repository = Repository::new(repo)?;
+    let repository = Repository::new(&repo)?;
     let target = target.unwrap_or_else(|| repository.repo().to_owned());
 
     task::block_on(async {
